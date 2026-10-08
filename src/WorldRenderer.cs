@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Tokenfall.Art;
+using Tokenfall.Core;
 using Tokenfall.Core.Content;
 using Tokenfall.Core.Generation;
 using Tokenfall.Core.Simulation;
@@ -72,12 +73,25 @@ namespace Conveer
                 var en = e;
                 string sprite = e.Sprite;
                 Color col = ToColor(e.Tint);
-                float scale = e.Scale, height = e.Height, ord = e.Pos.Y;
+                float scale = e.Scale, height = e.Height, ord = e.Pos.Y, angle = 0f;
                 bool flip = (e.Type == EntityType.Player || e.Type == EntityType.Enemy) && e.Facing.X < -0.1f;
                 switch (e.Type)
                 {
                     case EntityType.Player: sprite = "player:" + run.Character.Key; col = Color.white; scale = 1f; height = 0f; break;
-                    case EntityType.Projectile: scale = ((Projectile)e).Radius * 2f / 0.9f; break;
+                    case EntityType.Zone:
+                        DrawZone(run, (Zone)e, img, draws, camX, camY);
+                        continue;
+                    case EntityType.Projectile:
+                    {
+                        // Как WorldView: пуля летит носом вперёд; звёздочки, крестики, квадраты и шестигранники крутятся.
+                        var pr = (Projectile)e;
+                        scale = pr.Radius * 2f / 0.9f;
+                        bool spin = sprite == "tear" || (!pr.FromPlayer && (pr.Shape == ShotShape.Star || pr.Shape == ShotShape.Cross || pr.Shape == ShotShape.Square || pr.Shape == ShotShape.Hex));
+                        angle = (float)Math.Atan2(pr.Vel.Y, pr.Vel.X) + (spin ? (run.Time * (sprite == "tear" ? 600f : 260f) + pr.Id * 37f) * (float)Math.PI / 180f : 0f);
+                        if (!pr.FromPlayer && pr.Spark) col = Lerp(col, Color.white, 0.6f);
+                        if (pr.FromPlayer && sprite == "tear" && (pr.Flags & TearFlags.Explosive) != 0) { sprite = "tear_bomb"; col = Color.white; }
+                        break;
+                    }
                     case EntityType.Pickup:
                         var pk = (Pickup)e;
                         if (pk.Kind == PickupKind.Patch) sprite = "patch:" + pk.Value;
@@ -109,8 +123,27 @@ namespace Conveer
                     case EntityType.Effect:
                     {
                         var fx = (Effect)e;
-                        if (fx.Sprite == "zap") continue;
                         col.a *= fx.Alpha;
+                        if (fx.Sprite == "zap")
+                        {
+                            Vec2 d = fx.EndPos - fx.Pos;
+                            float za = (float)Math.Atan2(d.Y, d.X), zl = d.Length;
+                            Color zc = col;
+                            draws.Add((910, () => img.Draw(_f.Get("zap"), PX(fx.Pos.X), PY(fx.Pos.Y), U, zl, 0.35f, za, zc)));
+                            continue;
+                        }
+                        // Как WorldView: дуга удара распахивается, ударные волны и вспышки растут, угли и лужи лежат на полу.
+                        if (fx.Sprite == "swing") angle = fx.Angle + (-35f + 70f * (1f - fx.Alpha)) * (float)Math.PI / 180f;
+                        if (fx.Sprite == "poof" || fx.Sprite == "shockwave" || fx.Sprite == "splash" || fx.Sprite == "explosion" || fx.Sprite == "crate_open")
+                            scale = fx.Scale * (1.25f - 0.55f * fx.Alpha);
+                        if (fx.Sprite == "spark") angle = fx.Age * 4f * (float)Math.PI;
+                        if (fx.HurtRadius > 0f)
+                        {
+                            float pulse = fx.Sprite == "hazard_embers" ? 0.75f + 0.25f * (float)Math.Sin(run.Time * 14f + fx.Id) : 0.85f + 0.15f * (float)Math.Sin(run.Time * 3f + fx.Id);
+                            col.a = Math.Min(1f, fx.Life / 0.5f) * pulse;
+                            ord = -75;
+                            break;
+                        }
                         ord = 800;
                         break;
                     }
@@ -183,15 +216,129 @@ namespace Conveer
                 }
                 string sp = sprite;
                 Color cl = col;
-                float sc = scale, hh = height;
+                float sc = scale, hh = height, an = angle;
                 bool fl = flip;
-                if (e.Type != EntityType.Effect && e.Type != EntityType.Trapdoor && !decor)
+                if (e.Type != EntityType.Effect && e.Type != EntityType.Trapdoor && e.Type != EntityType.Projectile && !decor)
                     draws.Add((ord - 0.001f, () => img.Draw(_f.Get("shadow"), PX(en.Pos.X), PY(en.Pos.Y + 0.3f * sc), U, sc * 0.8f, sc * 0.8f, 0, new Color(1, 1, 1, 0.9f))));
                 var spr = studio ?? _f.Get(sp);
-                draws.Add((ord, () => img.Draw(spr, PX(en.Pos.X), PY(en.Pos.Y - hh * 0.6f), U, sc, sc, 0, cl, fl)));
+                draws.Add((ord, () => img.Draw(spr, PX(en.Pos.X), PY(en.Pos.Y - hh * 0.6f), U, sc, sc, an, cl, fl)));
             }
             foreach (var d in draws.OrderBy(d => d.order)) d.act();
+            DrawDarkness(run, img, camX, camY);
             DrawHud(run, img);
+        }
+
+        // ───────────── Зоны атак и темнота ─────────────
+
+        private const float Rad2Deg = 180f / (float)Math.PI;
+
+        /// <summary>
+        /// Зона атаки босса, как WorldView.DrawZone: пока предупреждает — мигает всё чаще и плотнее,
+        /// в момент удара вспыхивает белым, затем держится, пока активна. Лежит на полу под всеми.
+        /// </summary>
+        private void DrawZone(Run run, Zone z, Frame img, List<(float order, Action act)> draws, float camX, float camY)
+        {
+            float U = _u;
+            float PX(float x) => (x - camX) * U;
+            float PY(float y) => (y - camY) * U;
+            Color c = ToColor(z.Tint);
+            if (!z.Struck)
+            {
+                float k = z.WarnProgress;
+                float blink = 0.5f + 0.5f * (float)Math.Sin(run.Time * (8f + 22f * k));
+                c.a = 0.16f + 0.3f * k + 0.18f * blink;
+            }
+            else
+            {
+                float since = z.ActiveMax - z.Active;
+                c = Lerp(c, Color.white, since < 0.08f ? 0.6f : 0.15f);
+                c.a = since < 0.08f ? 1f : 0.7f;
+            }
+            float ord = z.Struck ? -64f : -65f;
+            switch (z.Shape)
+            {
+                case ZoneShape.Circle:
+                    draws.Add((ord, () => img.Draw(_f.Get("zone_disc"), PX(z.Pos.X), PY(z.Pos.Y), U, z.R, z.R, 0f, c)));
+                    break;
+                case ZoneShape.Ring:
+                {
+                    string key = SpriteFactory.ZoneRingKey(z.R > 0.01f ? z.R2 / z.R : 0f, z.GapHalf * 2f * Rad2Deg);
+                    draws.Add((ord, () => img.Draw(_f.Get(key), PX(z.Pos.X), PY(z.Pos.Y), U, z.R, z.R, z.GapAt, c)));
+                    break;
+                }
+                case ZoneShape.Sector:
+                {
+                    string key = SpriteFactory.ZoneSectorKey(z.Arc * 2f * Rad2Deg);
+                    draws.Add((ord, () => img.Draw(_f.Get(key), PX(z.Pos.X), PY(z.Pos.Y), U, z.R, z.R, z.Angle, c)));
+                    break;
+                }
+                case ZoneShape.Line:
+                {
+                    Vec2 d = z.End - z.Pos, mid = (z.Pos + z.End) * 0.5f;
+                    float len = Math.Max(0.1f, d.Length), ang = (float)Math.Atan2(d.Y, d.X);
+                    draws.Add((ord, () => img.Draw(_f.Get("zone_bar"), PX(mid.X), PY(mid.Y), U, len, z.Width, ang, c)));
+                    break;
+                }
+                case ZoneShape.Rect:
+                {
+                    Vec2 mid = (z.Pos + z.End) * 0.5f;
+                    float w = Math.Max(0.1f, z.End.X - z.Pos.X), h = Math.Max(0.1f, z.End.Y - z.Pos.Y);
+                    draws.Add((ord, () => img.Draw(_f.Get("zone_bar"), PX(mid.X), PY(mid.Y), U, w, h, 0f, c)));
+                    break;
+                }
+                default:
+                    // «Вся комната, кроме островков»: заливка блоками 2×2 пикселя, кант у островков.
+                    draws.Add((ord, () =>
+                    {
+                        var room = run.Room;
+                        int x0 = Math.Max(0, (int)PX(0f)), x1 = Math.Min(img.W, (int)PX(room.W));
+                        int y0 = Math.Max(0, (int)PY(0f)), y1 = Math.Min(img.H, (int)PY(room.H));
+                        for (int y = y0; y < y1; y += 2)
+                            for (int x = x0; x < x1; x += 2)
+                            {
+                                var p = new Vec2(camX + (x + 1f) / U, camY + (y + 1f) / U);
+                                float best = float.MaxValue;
+                                foreach (var s in z.Safe) best = Math.Min(best, Vec2.Distance(p, s) - z.SafeR);
+                                if (best < 0f) continue;
+                                img.Fill(x, y, 2, 2, c.r, c.g, c.b, c.a * (best < 0.2f ? 1f : 120f / 255f));
+                            }
+                    }));
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Темнота тёмных биомов и «Тишины» Шумового хора (как Hud.DrawDarknessMask): свет вокруг героя
+        /// и горящих ламп, остальное почти чёрное. Маска считается блоками 4×4 пикселя.
+        /// </summary>
+        private void DrawDarkness(Run run, Frame img, float camX, float camY)
+        {
+            if (run.IsHub || run.Biome == null || (run.Biome.Rule != BiomeRule.Darkness && run.Blackout <= 0f)) return;
+            float U = _u, h = img.H;
+            var lights = new List<(float x, float y, float inner, float outer)>
+            {
+                ((run.Player.Pos.X - camX) * U, (run.Player.Pos.Y - camY) * U, h * 0.135f, h * 0.375f),
+            };
+            foreach (var l in run.LitLamps())
+            {
+                float outer = Run.LampLightRadius * U * (0.75f + 0.25f * l.Strength);
+                lights.Add(((l.Pos.X - camX) * U, (l.Pos.Y - camY) * U, outer * 0.5f, outer));
+            }
+            const int B = 4;
+            for (int y = 0; y < img.H; y += B)
+                for (int x = 0; x < img.W; x += B)
+                {
+                    float a = 1f;
+                    foreach (var L in lights)
+                    {
+                        float dx = x + B * 0.5f - L.x, dy = y + B * 0.5f - L.y;
+                        float d = (float)Math.Sqrt(dx * dx + dy * dy);
+                        float k = d <= L.inner ? 0f : d >= L.outer ? 1f : (d - L.inner) / (L.outer - L.inner);
+                        if (k < a) a = k;
+                        if (a <= 0f) break;
+                    }
+                    if (a > 0f) img.Fill(x, y, B, B, 2f / 255f, 4f / 255f, 12f / 255f, a * 250f / 255f);
+                }
         }
 
         // ───────────── Статичный слой ─────────────

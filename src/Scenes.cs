@@ -151,6 +151,190 @@ namespace Conveer
             }
         }
 
+        /// <summary>
+        /// Витрина атак: комната босса на его этаже и в его биоме; босс по очереди показывает каждую свою атаку —
+        /// сначала обычные (фаза 1), затем атаки ярости (фаза ярости). Бот-уклонист не стреляет, а уходит от атак;
+        /// герою возвращается здоровье, чтобы он не погиб, а попадания было видно. Над кадром — номер и название атаки.
+        /// После каждой атаки комната очищается от остатков (пуль, зон, призванных врагов).
+        /// </summary>
+        public void AttackReel(Session s, string bossKey)
+        {
+            var def = BossDatabase.Get(bossKey);
+            var (stage, biome) = WhereIs(def);
+            var run = NewRun(stage, biome, (uint)(Rng.Hash(bossKey + ":reel") & 0x7FFFFFFF) | 1u);
+            run.ShieldTime = 0f;
+            s.Flow.RunStarted(run);
+            var node = run.Floor.Rooms.First(r => r.Type == RoomType.Boss);
+            node.BossKey = bossKey;
+            node.Revealed = true;
+            run.EnterRoom(node.Index, null);
+            OnEvents(s, run);
+            run.Events.Clear();
+            World.ResetCamera();
+            var boss = run.Room.Entities.OfType<BossEntity>().First(b => !b.IsSegment && !b.Dead);
+            s.Note($"комната босса {bossKey}: этаж {stage}, биом {biome}");
+
+            var dodger = new Dodger();
+            string label = def.Key.ToUpperInvariant(), sub = "";
+            bool forced = false;
+            void Keep()
+            {
+                // Свои атаки босс не начинает — только те, что показывает витрина; герой не погибает.
+                if (!forced && !boss.InAttack) boss.AttackTimer = 99f;
+                run.Health.RedMax = Math.Max(run.Health.RedMax, 12);
+                run.Health.Red = run.Health.RedMax;
+            }
+            void Step(float seconds, Func<bool> stop = null)
+            {
+                int n = (int)Math.Round(seconds / Session.Dt);
+                for (int i = 0; i < n; i++)
+                {
+                    s.Tick(() =>
+                    {
+                        Keep();
+                        run.Tick(dodger.Next(run), Session.Dt);
+                        Keep();
+                        OnEvents(s, run);
+                        run.Events.Clear();
+                        if (!run.Over) s.Flow.Tick(run);
+                    }, f =>
+                    {
+                        World.Render(run, f, FrameDt);
+                        Caption(f, label, sub);
+                        _last.CopyFrom(f);
+                    });
+                    if (stop != null && stop()) break;
+                }
+            }
+
+            // Вступление босса; герой встаёт ниже босса (в игре он входит у двери, здесь — в центре, под боссом).
+            run.Player.Pos = run.Room.NearestFree(ClampIn(run, boss.Pos + new Vec2(0.6f, 4f)));
+            Step(2.5f);
+            var list = Run.PossibleAttacks(def);
+            int index = 0;
+            foreach (var a in list)
+            {
+                index++;
+                var info = BossAttacks.Info(a);
+                bool rage = def.RageAttacks.Contains(a) && !def.Attacks.Contains(a);
+                if (rage && !boss.Raging)
+                {
+                    boss.Phase = Math.Max(1, boss.PhaseCount / 2);
+                    boss.Raging = true;
+                    s.Note("босс в ярости: фаза " + (boss.Phase + 1) + "/" + boss.PhaseCount);
+                }
+                // Герой — в нескольких шагах от босса, на свободной клетке.
+                if (Vec2.Distance(run.Player.Pos, boss.Pos) < 3f)
+                {
+                    Vec2 away = run.Player.Pos - boss.Pos;
+                    if (away.Length < 0.5f) away = new Vec2(0.3f, 1f);
+                    run.Player.Pos = run.Room.NearestFree(ClampIn(run, boss.Pos + away.Normalized * 4f));
+                    run.Player.Vel = Vec2.Zero;
+                }
+                label = $"{index}/{list.Count}  {English(info.Name)}" + (rage ? "  [RAGE]" : "");
+                sub = English(info.Description);
+                s.Note($"атака {index}/{list.Count}: «{Loc.T(info.Name)}» ({a}){(rage ? ", ярость" : "")} — {Loc.T(info.Description)}");
+                Begin(run, boss, a);
+                forced = true;
+                Step(10f, () => !boss.InAttack);
+                forced = false;
+                boss.AttackTimer = 99f;
+                if (boss.InAttack) s.Note("атака не закончилась за 10 с");
+                // Хвост атаки: догоняющие пули и зоны.
+                Step(1.4f);
+                Clean(run, boss);
+                Step(0.6f);
+            }
+            label = def.Key.ToUpperInvariant() + "  ALL " + list.Count + " ATTACKS SHOWN";
+            sub = "";
+            Step(1.5f);
+        }
+
+        private static Vec2 ClampIn(Run run, Vec2 p) => new Vec2(Math.Max(1.5f, Math.Min(run.Room.W - 1.5f, p.X)), Math.Max(1.5f, Math.Min(run.Room.H - 1.5f, p.Y)));
+
+        /// <summary>Запуск атаки, как StartBossAttack в ядре (и BossAttackTests.Begin), но выбранной сценой.</summary>
+        private static void Begin(Run run, BossEntity b, BossAttack a)
+        {
+            b.CurrentAttack = a;
+            b.LastAttack = a;
+            b.InAttack = true;
+            b.AttackElapsed = 0f;
+            b.AttackStep = 0;
+            b.AttackDir = (run.Player.Pos - b.Pos).Normalized;
+            b.MarkPos = run.Player.Pos;
+            b.Timer = 0f;
+            b.AuxA = b.AuxB = 0f;
+            b.AuxN = 0;
+            b.AuxPos = b.Pos;
+            b.AuxVel = Vec2.Zero;
+            b.AuxPath.Clear();
+            b.AuxZone = null;
+            run.Events.Add(new GameEvent { Type = GameEventType.BossAttack, Pos = b.Pos, Key = a.ToString() });
+        }
+
+        /// <summary>Остатки прошлой атаки: вражеские пули, лучи, зоны, призванные враги.</summary>
+        private static void Clean(Run run, BossEntity boss)
+        {
+            foreach (var e in run.Room.Entities)
+            {
+                if (e.Dead || e == boss) continue;
+                if (e.Type == EntityType.Zone) e.Dead = true;
+                else if (e is Projectile pr && !pr.FromPlayer) e.Dead = true;
+                else if (e is Beam bm && !bm.FromPlayer) e.Dead = true;
+                else if (e is EnemyEntity && !(e is BossEntity)) e.Dead = true;
+            }
+            run.Blackout = 0f;
+            run.BulletFreeze = 0f;
+        }
+
+        /// <summary>Английский текст для подписи: у пиксельного шрифта игры 3×5 нет кириллицы и типографских знаков.</summary>
+        private static string English(string ru)
+        {
+            var prev = Loc.Current;
+            Loc.Current = Language.English;
+            string t = Loc.T(ru);
+            Loc.Current = prev;
+            return t.Replace('×', 'x').Replace('«', '"').Replace('»', '"').Replace('“', '"').Replace('”', '"').Replace('’', '\'')
+                .Replace("—", "-").Replace("–", "-").Replace("…", "...").Replace(';', ',');
+        }
+
+        /// <summary>Подпись витрины: название атаки крупно, описание мельче (шрифт игры 3×5 — латиница).</summary>
+        private static void Caption(Frame f, string title, string desc)
+        {
+            int sc = Math.Max(2, f.H / 200), ds = Math.Max(1, sc * 2 / 3);
+            int y = f.H / 14 + 6 * sc;
+            int tw = Frame.TextWidth(title, sc);
+            var lines = Wrap(desc, Math.Max(20, (f.W * 8 / 10) / (4 * ds)));
+            int boxH = 7 * sc + lines.Count * 7 * ds + 4 * sc;
+            int boxW = Math.Max(tw, lines.Count == 0 ? 0 : lines.Max(l => Frame.TextWidth(l, ds))) + 8 * sc;
+            f.Fill((f.W - boxW) / 2, y - 2 * sc, boxW, boxH, 0.02f, 0.02f, 0.06f, 0.6f);
+            f.Text(title, (f.W - tw) / 2, y, sc, new Color(1f, 0.85f, 0.35f));
+            y += 7 * sc;
+            foreach (var l in lines)
+            {
+                f.Text(l, (f.W - Frame.TextWidth(l, ds)) / 2, y, ds, new Color(0.85f, 0.9f, 1f));
+                y += 7 * ds;
+            }
+        }
+
+        private static List<string> Wrap(string text, int width)
+        {
+            var lines = new List<string>();
+            if (string.IsNullOrEmpty(text)) return lines;
+            var cur = "";
+            foreach (var w in text.Split(' '))
+            {
+                if (cur.Length > 0 && cur.Length + 1 + w.Length > width)
+                {
+                    lines.Add(cur);
+                    cur = w;
+                }
+                else cur = cur.Length == 0 ? w : cur + " " + w;
+            }
+            if (cur.Length > 0) lines.Add(cur);
+            return lines;
+        }
+
         /// <summary>Смерть героя: урон, пока забег не закончится.</summary>
         public void Die(Session s, Run run, AutoPilot bot)
         {
@@ -413,6 +597,21 @@ namespace Conveer
                 if (shown.Contains(b.Key) || BossDatabase.IsSplitChild(b)) continue;
                 if (DiskLibrary.FindFile(cfg.MusicDir, "boss_" + b.Key) == null) continue;
                 list.Add(BossScene("boss_" + b.Key, b, "Личный трек босса · " + b.Key));
+            }
+
+            // Витрины атак: по видео на каждого босса — все его атаки по очереди, с подписью.
+            foreach (var b in BossDatabase.All.Concat(BossDatabase.MiniBosses).Distinct())
+            {
+                if (BossDatabase.IsSplitChild(b)) continue;
+                var attacks = Run.PossibleAttacks(b);
+                var key = b.Key;
+                list.Add(new SceneDef
+                {
+                    Id = "attacks_" + key, Title = "Атаки · " + Loc.T(b.Name),
+                    Description = $"Босс «{key}» по очереди показывает все свои атаки ({attacks.Count}); бот только уворачивается. "
+                        + string.Join("; ", attacks.Select((a, i) => (i + 1) + ". " + Loc.T(BossAttacks.Name(a)) + (b.RageAttacks.Contains(a) && !b.Attacks.Contains(a) ? " (ярость)" : ""))) + ".",
+                    Shoot = (s, st) => st.AttackReel(s, key),
+                });
             }
 
             list.Add(new SceneDef

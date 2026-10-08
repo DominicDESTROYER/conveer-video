@@ -102,7 +102,8 @@ namespace Conveer
             int s = Math.Max(1, Frame.H / 240);
             var f = Frame;
             string head = Id.ToUpperInvariant() + "  " + Stamp(_t);
-            f.Text(head, f.W - Frame.TextWidth(head, s) - 6 * s, 5 * s, s, new Color(0.75f, 0.9f, 1f));
+            // Справа внизу: сверху по центру — полоса здоровья босса и подписи сцен.
+            f.Text(head, f.W - Frame.TextWidth(head, s) - 6 * s, f.H - 10 * s, s, new Color(0.75f, 0.9f, 1f));
 
             var lines = new List<(string text, Color c, float vol)>();
             foreach (var v in Music.Voices)

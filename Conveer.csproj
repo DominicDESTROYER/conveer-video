@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Конвейер видео TOKENFALL: рендерит сцены игры со звуком (бои с боссами, экраны итогов, ролики, биомы)
+    и кодирует MP4 через ffmpeg. Исходники игры берутся из соседней папки: по умолчанию ../game-token
+    (папки конвейера и игры лежат рядом). Другой путь: dotnet build -p:GameRoot=/путь/к/игре
+    или поле "gameRoot" в conveer.json (его читают run.sh / run.cmd).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Conveer</AssemblyName>
+    <RootNamespace>Conveer</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GameRoot Condition="'$(GameRoot)' == ''">$(MSBuildThisFileDirectory)../game-token</GameRoot>
+  </PropertyGroup>
+
+  <Target Name="CheckGameRoot" BeforeTargets="ResolveProjectReferences;CoreCompile">
+    <Error Condition="!Exists('$(GameRoot)/Assets/Scripts/Core')"
+           Text="Не найдены исходники игры в '$(GameRoot)'. Положите папку game-token рядом с conveer-video или укажите путь: -p:GameRoot=... (или gameRoot в conveer.json)." />
+    <Error Condition="Exists('$(GameRoot)/Assets/Scripts/Core') And !Exists('$(GameRoot)/Assets/Scripts/Art/Audio/MusicDirector.cs')"
+           Text="В '$(GameRoot)' старая версия игры без режиссёра музыки (Assets/Scripts/Art/Audio). Обновите game-token: git pull (ветка domi/wizardly-pascal-8ue4uf или новее)." />
+  </Target>
+
+  <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+    <!-- Процедурные спрайты игры (плитки, пули, предметы) и мини-шим UnityEngine из превью игры. -->
+    <Compile Include="$(GameRoot)/Assets/Scripts/Game/PixelCanvas.cs" Link="Game/PixelCanvas.cs" />
+    <Compile Include="$(GameRoot)/Assets/Scripts/Game/SpriteFactory.cs" Link="Game/SpriteFactory.cs" />
+    <Compile Include="$(GameRoot)/Assets/Scripts/Game/SpriteFactory.Details.cs" Link="Game/SpriteFactory.Details.cs" />
+    <Compile Include="$(GameRoot)/dotnet/Tokenfall.Preview/UnityShim.cs" Link="Game/UnityShim.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ядро (симуляция, контент, каталог музыки) и студия (листы, ролики, режиссёр музыки, синтезатор). -->
+    <ProjectReference Include="$(GameRoot)/dotnet/Tokenfall.Core/Tokenfall.Core.csproj" />
+    <ProjectReference Include="$(GameRoot)/dotnet/Tokenfall.Art/Tokenfall.Art.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="conveer.json" CopyToOutputDirectory="Never" />
+  </ItemGroup>
+</Project>

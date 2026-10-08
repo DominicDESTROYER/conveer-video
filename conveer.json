@@ -1,0 +1,33 @@
+{
+  "gameRoot": "../game-token",
+  "output": "out",
+
+  "ffmpeg": "ffmpeg",
+  "ffprobe": "ffprobe",
+
+  "width": 1280,
+  "height": 720,
+  "fps": 30,
+  "crf": 20,
+  "preset": "veryfast",
+  "subtitles": "burn",
+  "language": "ru",
+
+  "volumes": { "master": 0.9, "music": 0.5, "sfx": 0.8 },
+
+  "seconds": {
+    "title": 30,
+    "hub": 24,
+    "biome": 30,
+    "beforeBoss": 6,
+    "bossFight": 50,
+    "afterBoss": 14,
+    "results": 10,
+    "afterResults": 6,
+    "transition": 10
+  },
+
+  "scenes": ["*"],
+  "analyzeTracks": true,
+  "seed": 7
+}

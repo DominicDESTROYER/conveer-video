@@ -533,6 +533,65 @@ namespace Conveer
             }
         }
 
+        // ───────────── Обучение ─────────────
+
+        /// <summary>Как называется орган управления в тексте шага – раскладка по умолчанию для устройства.</summary>
+        private static string TutorName(TutorialControl c, TutorDevice device, bool ps)
+        {
+            int i = (int)c;
+            switch (device)
+            {
+                case TutorDevice.Touch:
+                    string[] touch = { "левый экранный стик", "правый экранный стик", "отклонить стик прицела (короткий тап – очередь с автоприцелом)", "кнопка «НАВЫК»", "кнопка «ОРУЖ.»", "кнопка «ВЗЯТЬ»", "кнопка «АКТ.»", "кнопка «КАРМ.»", "кнопка «БОМБА»", "касание мини-карты", "кнопка «II» вверху экрана" };
+                    return touch[i];
+                case TutorDevice.Gamepad:
+                    string[] psNames = { "левый стик", "правый стик", "R2 или наклон правого стика", "L2", "△", "✕", "□", "R1", "L1", "Create", "Options" };
+                    string[] xbox = { "левый стик", "правый стик", "RT или наклон правого стика", "LT", "Y", "A", "X", "RB", "LB", "View", "Menu" };
+                    return (ps ? psNames : xbox)[i];
+                default:
+                    string[] kb = { "WASD", "мышь", "ЛКМ (или стрелки – сразу в 8 сторон)", "Пробел", "Tab", "E", "Q", "R", "F", "M", "Esc" };
+                    return kb[i];
+            }
+        }
+
+        /// <summary>
+        /// Обучение подряд: ролик каждого шага (одна петля) с заголовком и текстом шага в субтитрах – под
+        /// выбранное устройство. Устройство в углу роликов нажимает кнопки раскладки по умолчанию.
+        /// </summary>
+        public void Tutorial(Session s, TutorDevice device, bool ps)
+        {
+            TutorialInput.Defaults(device, ps);
+            s.Flow.Hub();
+            try
+            {
+                foreach (var step in TutorialScript.Build())
+                {
+                    var scene = CineCatalog.TutorialScene(step.Clip);
+                    if (scene == null) continue;
+                    string id = scene.Id;
+                    if (!_cine.TryGetValue(id, out var assets)) _cine[id] = assets = CineAssets.Build(scene.Needs);
+                    string text = Loc.T(step.Text);
+                    foreach (var (token, control) in TutorialScript.Tokens) text = text.Replace(token, TutorName(control, device, ps));
+                    var color = step.Kind == TutorialKind.Do ? new Rgba(255, 214, 90) : new Rgba(90, 220, 255);
+                    s.Subs.Add((s.T, s.T + CineCatalog.TutorialLoop - 0.05f, Loc.T(step.Title).ToUpperInvariant(), text, color));
+                    s.Note("шаг обучения " + step.Id + (step.Kind == TutorialKind.Do ? " (действие)" : " (показ)"));
+                    float t = 0f;
+                    while (t < CineCatalog.TutorialLoop)
+                    {
+                        s.Tick(() => t += Session.Dt, f =>
+                        {
+                            scene.Render(_canvas, assets, t);
+                            f.Clear(0.055f, 0.047f, 0.11f);
+                            int k = Math.Max(1, Math.Min(f.W / CineCanvas.W, f.H / CineCanvas.H));
+                            f.Blit(_canvas.Img, (f.W - CineCanvas.W * k) / 2, (f.H - CineCanvas.H * k) / 2, k);
+                            _last.CopyFrom(f);
+                        });
+                    }
+                }
+            }
+            finally { TutorialInput.Defaults(TutorDevice.Keyboard, false); }
+        }
+
         // ───────────── Каталог сцен ─────────────
 
         private static (string boss, string title)[] TierBosses =
@@ -781,6 +840,19 @@ namespace Conveer
                     }
                 },
             });
+            foreach (var (id, title, device, ps) in new[]
+            {
+                ("tutorial_pc", "Обучение: клавиатура и мышь", TutorDevice.Keyboard, false),
+                ("tutorial_ps", "Обучение: геймпад PlayStation", TutorDevice.Gamepad, true),
+                ("tutorial_xbox", "Обучение: геймпад Xbox", TutorDevice.Gamepad, false),
+                ("tutorial_phone", "Обучение: телефон", TutorDevice.Touch, false),
+            })
+                list.Add(new SceneDef
+                {
+                    Id = id, Title = title, Expect = new[] { "hub" },
+                    Description = "Все 33 ролика-показа обучения подряд (управление, комнаты, Убежище) с текстом шагов под это устройство; в углу роликов нажимается кнопка из раскладки.",
+                    Shoot = (s, st) => st.Tutorial(s, device, ps),
+                });
             return list;
         }
 

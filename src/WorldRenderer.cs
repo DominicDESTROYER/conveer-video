@@ -142,6 +142,14 @@ namespace Conveer
                         if (fx.Sprite == "poof" || fx.Sprite == "shockwave" || fx.Sprite == "splash" || fx.Sprite == "explosion" || fx.Sprite == "crate_open")
                             scale = fx.Scale * (1.25f - 0.55f * fx.Alpha);
                         if (fx.Sprite == "spark") angle = fx.Age * 4f * (float)Math.PI;
+                        if (fx.Sprite.StartsWith("scar_"))
+                        {
+                            // Следы ударов (трещины, гарь, разрезы) лежат на полу и медленно тают.
+                            angle = fx.Angle;
+                            col.a = Math.Min(1f, fx.Alpha * 2f);
+                            ord = -74;
+                            break;
+                        }
                         if (fx.HurtRadius > 0f)
                         {
                             float pulse = fx.Sprite == "hazard_embers" ? 0.75f + 0.25f * (float)Math.Sin(run.Time * 14f + fx.Id) : 0.85f + 0.15f * (float)Math.Sin(run.Time * 3f + fx.Id);
@@ -264,19 +272,16 @@ namespace Conveer
             float PX(float x) => (x - camX) * U;
             float PY(float y) => (y - camY) * U;
             Color c = ToColor(z.Tint);
-            if (!z.Struck)
-            {
-                float k = z.WarnProgress;
-                float blink = 0.5f + 0.5f * (float)Math.Sin(run.Time * (8f + 22f * k));
-                c.a = 0.16f + 0.3f * k + 0.18f * blink;
-            }
+            // Как WorldView: сама зона – лишь тихая подложка; предупреждение и удар рисует StrikeFx.
+            if (!z.Struck) c.a = 0.1f + 0.1f * z.WarnProgress;
             else
             {
                 float since = z.ActiveMax - z.Active;
-                c = Lerp(c, Color.white, since < 0.08f ? 0.6f : 0.15f);
-                c.a = since < 0.08f ? 1f : 0.7f;
+                c = Lerp(c, Color.white, since < 0.06f ? 0.5f : 0.1f);
+                c.a = since < 0.06f ? 0.6f : 0.28f;
             }
             float ord = z.Struck ? -64f : -65f;
+            AddStrikeFx(run, z, img, draws, PX, PY);
             // Большие кольца и секторы выходят за стены – рисуем их попиксельно в пределах комнаты (как WorldView).
             bool big = (z.Shape == ZoneShape.Sector || z.Shape == ZoneShape.Ring) &&
                        (z.Pos.X - z.R < 0f || z.Pos.Y - z.R < 0f || z.Pos.X + z.R > run.Room.W || z.Pos.Y + z.R > run.Room.H);
@@ -348,6 +353,26 @@ namespace Conveer
                             }
                     }));
                     break;
+            }
+        }
+
+        private readonly List<FxDraw> _strike = new List<FxDraw>();
+
+        /// <summary>Эффект удара зоны (StrikeFx – та же раскладка, что в игре): на полу над зоной и поверх существ.</summary>
+        private void AddStrikeFx(Run run, Zone z, Frame img, List<(float order, Action act)> draws, Func<float, float> PX, Func<float, float> PY)
+        {
+            _strike.Clear();
+            StrikeFx.Build(z, run.Room.W, run.Room.H, _strike);
+            float U = _u;
+            for (int i = 0; i < _strike.Count; i++)
+            {
+                var d = _strike[i];
+                var spr = _f.Get(d.Key);
+                if (spr?.texture == null) continue;
+                float nw = spr.texture.width / spr.pixelsPerUnit, nh = spr.texture.height / spr.pixelsPerUnit;
+                var col = ToColor(d.Tint);
+                float px = PX(d.X), py = PY(d.Y), sx = d.W / nw, sy = d.H / nh, rot = d.Rot;
+                draws.Add((d.Over ? 850f + i * 1e-4f : -63f + i * 1e-4f, () => img.Draw(spr, px, py, U, sx, sy, rot, col)));
             }
         }
 

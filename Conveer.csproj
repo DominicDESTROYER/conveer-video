@@ -34,6 +34,7 @@
     <Compile Include="$(GameRoot)/Assets/Scripts/Game/PixelCanvas.cs" Link="Game/PixelCanvas.cs" />
     <Compile Include="$(GameRoot)/Assets/Scripts/Game/SpriteFactory.cs" Link="Game/SpriteFactory.cs" />
     <Compile Include="$(GameRoot)/Assets/Scripts/Game/SpriteFactory.Details.cs" Link="Game/SpriteFactory.Details.cs" />
+    <Compile Include="$(GameRoot)/Assets/Scripts/Game/SpriteFactory.Fx.cs" Link="Game/SpriteFactory.Fx.cs" />
     <Compile Include="$(GameRoot)/dotnet/Tokenfall.Preview/UnityShim.cs" Link="Game/UnityShim.cs" />
   </ItemGroup>
 

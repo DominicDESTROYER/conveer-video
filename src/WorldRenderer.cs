@@ -50,6 +50,8 @@ namespace Conveer
             // Камера: комната, которая помещается в кадр, – по центру; большая – за героем, но не за стенами.
             float tx = room.W + 2 <= vw ? (room.W - vw) / 2f : Math.Max(-1f, Math.Min(run.Player.Pos.X - vw / 2f, room.W + 1 - vw));
             float ty = room.H + 2 <= vh ? (room.H - vh) / 2f : Math.Max(-1f, Math.Min(run.Player.Pos.Y - vh / 2f, room.H + 1 - vh));
+            // Арена финала: как в игре (CameraRig.ArenaCenterRow) – в кадре и тело, залезающее на верхнюю стену, и весь пол.
+            if (ArenaBody(run) != null) ty = 6.4f - vh / 2f;
             if (float.IsNaN(_camX) || _camRun != run || _staticRoom != room)
             {
                 _camX = tx;

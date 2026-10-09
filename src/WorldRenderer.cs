@@ -494,8 +494,8 @@ namespace Conveer
             for (int y = 0; y < room.H; y++)
                 for (int x = 0; x < room.W; x++)
                 {
-                    float k = ((x + y) & 1) == 0 ? 1f : 0.93f;
-                    img.Draw(_f.Get("floor"), PX(x + 0.5f), PY(y + 0.5f), U, 1, 1, 0, new Color(floor.r * k, floor.g * k, floor.b * k, 1));
+                    float k = ((x + y) & 1) == 0 ? 1f : 0.94f;
+                    img.Draw(_f.Get(SpriteFactory.FloorKey(x, y, run.CurrentNode.Index + run.Stage * 31)), PX(x + 0.5f), PY(y + 0.5f), U, 1, 1, 0, new Color(floor.r * k, floor.g * k, floor.b * k, 1));
                 }
             for (int x = -1; x <= room.W; x++)
             {
@@ -528,7 +528,7 @@ namespace Conveer
                         case TileType.Rock: key = "rock"; c = light; break;
                         case TileType.Metal: key = "metal"; c = Lerp(wall, Color.white, 0.2f); break;
                         case TileType.Junk: key = "junk"; c = Lerp(light, new Color(0.7f, 0.6f, 0.45f), 0.5f); break;
-                        case TileType.Pit: key = "pit"; break;
+                        case TileType.Pit: key = SpriteFactory.PitKey(room, x, y); break;
                         case TileType.Spikes: key = "spikes"; break;
                         case TileType.Fire: key = "fire"; break;
                         case TileType.Tinted: key = "tinted"; c = Lerp(light, accent, 0.25f); break;

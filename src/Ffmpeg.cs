@@ -32,7 +32,7 @@ namespace Conveer
             }
         }
 
-        /// <summary>Есть ли в сборке ffmpeg фильтр subtitles (libass) — чтобы вшивать русские субтитры в кадр.</summary>
+        /// <summary>Есть ли в сборке ffmpeg фильтр subtitles (libass) – чтобы вшивать русские субтитры в кадр.</summary>
         public bool HasLibass
         {
             get
@@ -86,7 +86,7 @@ namespace Conveer
         }
 
         /// <summary>
-        /// Громкость по окнам 0,5 с (дБ, моно 4 кГц) — чтобы найти тихое вступление и долгое затухание в конце.
+        /// Громкость по окнам 0,5 с (дБ, моно 4 кГц) – чтобы найти тихое вступление и долгое затухание в конце.
         /// </summary>
         public List<double> Envelope(string path)
         {
@@ -138,7 +138,7 @@ namespace Conveer
             return data;
         }
 
-        /// <summary>Видеопоток без звука: RGB-кадры в stdin, H.264 на выходе, при желании — вшитые субтитры (.ass).</summary>
+        /// <summary>Видеопоток без звука: RGB-кадры в stdin, H.264 на выходе, при желании – вшитые субтитры (.ass).</summary>
         public sealed class VideoWriter : IDisposable
         {
             private readonly Process _p;
@@ -154,7 +154,7 @@ namespace Conveer
                 string dir = null;
                 if (assFile != null)
                 {
-                    // Путь к субтитрам — относительный (рабочая папка процесса): так фильтр не спотыкается о «C:\».
+                    // Путь к субтитрам – относительный (рабочая папка процесса): так фильтр не спотыкается о «C:\».
                     dir = System.IO.Path.GetDirectoryName(assFile);
                     vf += ",subtitles=" + System.IO.Path.GetFileName(assFile);
                 }
@@ -182,8 +182,8 @@ namespace Conveer
         }
 
         /// <summary>
-        /// Видео + WAV → итоговый MP4. ass — вшить субтитры в кадр (перекодирование, нужен libass),
-        /// иначе srt — отдельной дорожкой (включается в плеере).
+        /// Видео + WAV → итоговый MP4. ass – вшить субтитры в кадр (перекодирование, нужен libass),
+        /// иначе srt – отдельной дорожкой (включается в плеере).
         /// </summary>
         public void Mux(string video, string wav, string srt, string ass, string output)
         {

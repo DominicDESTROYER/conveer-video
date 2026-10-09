@@ -9,11 +9,11 @@ namespace Conveer
 {
     /// <summary>
     /// Конвейер видео TOKENFALL.
-    ///   dotnet run -c Release --                     — все сцены из conveer.json ("scenes")
-    ///   dotnet run -c Release -- boss_* death        — только выбранные (имя или шаблон с *)
-    ///   dotnet run -c Release -- list                — список сцен
-    ///   dotnet run -c Release -- tracks              — только проверка треков и отчёт
-    ///   --config путь/conveer.json   --quick (640×360, 24 к/с — быстрая проверка)   --no-analyze
+    ///   dotnet run -c Release --                     – все сцены из conveer.json ("scenes")
+    ///   dotnet run -c Release -- boss_* death        – только выбранные (имя или шаблон с *)
+    ///   dotnet run -c Release -- list                – список сцен
+    ///   dotnet run -c Release -- tracks              – только проверка треков и отчёт
+    ///   --config путь/conveer.json   --quick (640×360, 24 к/с – быстрая проверка)   --no-analyze
     /// </summary>
     public static class Program
     {
@@ -61,7 +61,7 @@ namespace Conveer
                 return 3;
             }
             Console.WriteLine("Игра:   " + cfg.GameDir);
-            Console.WriteLine("Музыка: " + cfg.MusicDir + (Directory.Exists(cfg.MusicDir) ? "" : "  (папки нет — везде прозвучит процедурная музыка)"));
+            Console.WriteLine("Музыка: " + cfg.MusicDir + (Directory.Exists(cfg.MusicDir) ? "" : "  (папки нет – везде прозвучит процедурная музыка)"));
             Console.WriteLine("Вывод:  " + cfg.OutDir);
             Console.WriteLine(ffVersion + (ff.HasLibass ? "" : "  (без libass: субтитры роликов будут отдельной дорожкой)"));
 
@@ -83,7 +83,7 @@ namespace Conveer
 
             Console.WriteLine("Проверка треков…");
             var tracks = Report.AnalyzeTracks(cfg, ff);
-            // Одинаковые замечания (например, «MP3 внутри .ogg» у всех файлов) — одной строкой: треки и их числа.
+            // Одинаковые замечания (например, «MP3 внутри .ogg» у всех файлов) – одной строкой: треки и их числа.
             var num = new System.Text.RegularExpressions.Regex(@"(?<![A-Za-z])[−-]?\d+(?:[.,]\d+)?\s*(?:с|LUFS|dBTP)?");
             foreach (var g in tracks.SelectMany(t => t.Warnings.Select(w => (t.File, w))).GroupBy(x => num.Replace(x.w, "#")))
             {
@@ -95,7 +95,7 @@ namespace Conveer
                 }
                 string head = num.IsMatch(first) ? first.Substring(0, num.Match(first).Index).Trim() : first.Split('(')[0].Trim();
                 var items = g.Select(x => num.IsMatch(x.w) ? $"{x.File} ({num.Match(x.w).Value.Trim()})" : x.File);
-                Console.WriteLine($"  {head} — {g.Count()} трек(ов): {string.Join(", ", items)}");
+                Console.WriteLine($"  {head} – {g.Count()} трек(ов): {string.Join(", ", items)}");
             }
 
             var results = new List<SceneResult>();
@@ -108,7 +108,7 @@ namespace Conveer
                 index++;
                 var sw = Stopwatch.StartNew();
                 var r = new SceneResult { Scene = scene };
-                Console.Write($"[{index}/{selected.Count}] {scene.Id} — {scene.Title} … ");
+                Console.Write($"[{index}/{selected.Count}] {scene.Id} – {scene.Title} … ");
                 try
                 {
                     var s = new Session(scene.Id, cfg, ff, lib, tmp);
@@ -132,7 +132,7 @@ namespace Conveer
                 Console.WriteLine($"{r.Seconds:0} с видео за {r.RenderSeconds:0} с" + (probs.Count > 0 ? "  ⚠ " + string.Join("; ", probs) : ""));
             }
             try { Directory.Delete(tmp, true); } catch (Exception) { }
-            // Отчёт — по всем записанным сценам: и этого запуска, и прошлых (если писали только часть).
+            // Отчёт – по всем записанным сценам: и этого запуска, и прошлых (если писали только часть).
             Report.Write(cfg, tracks, SceneResult.LoadAll(logs, all), ffVersion);
             Console.WriteLine($"Готово за {total.Elapsed.TotalMinutes:0.0} мин. Отчёт: {Path.Combine(cfg.OutDir, "index.html")}");
             return results.Any(r => r.Error != null) ? 1 : 0;

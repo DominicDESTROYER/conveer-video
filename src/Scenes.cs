@@ -25,7 +25,7 @@ namespace Conveer
     }
 
     /// <summary>
-    /// Съёмочная площадка: общие отрисовщики и шаги сценариев — забег с ботом, бой с боссом, ролик,
+    /// Съёмочная площадка: общие отрисовщики и шаги сценариев – забег с ботом, бой с боссом, ролик,
     /// экран итогов, титул, Убежище. Каждый шаг сообщает MusicFlow о том же, о чём сообщает GameApp в игре.
     /// </summary>
     public sealed class Studio
@@ -80,7 +80,7 @@ namespace Conveer
             }
         }
 
-        /// <summary>Игра ботом (bot = null — герой стоит): seconds секунд или пока stop() не скажет «хватит». extra — логика такта.</summary>
+        /// <summary>Игра ботом (bot = null – герой стоит): seconds секунд или пока stop() не скажет «хватит». extra – логика такта.</summary>
         public void Play(Session s, Run run, AutoPilot bot, float seconds, Func<bool> stop = null, Action<float> extra = null)
         {
             int n = (int)Math.Round(seconds / Session.Dt);
@@ -90,10 +90,10 @@ namespace Conveer
                 s.Tick(() =>
                 {
                     run.Tick(bot != null ? bot.Next(run, Session.Dt) : default(InputFrame), Session.Dt);
-                    // Подмога и урон сцены — до чтения событий, чтобы их звуки и победа над боссом не потерялись.
+                    // Подмога и урон сцены – до чтения событий, чтобы их звуки и победа над боссом не потерялись.
                     extra?.Invoke(elapsed);
                     OnEvents(s, run);
-                    // Как GameApp: музыка забега (босс, джингл победы, возврат фона) — после такта симуляции.
+                    // Как GameApp: музыка забега (босс, джингл победы, возврат фона) – после такта симуляции.
                     if (!run.IsHub && !run.Over) s.Flow.Tick(run);
                 }, f => DrawRun(run, f));
                 elapsed += Session.Dt;
@@ -133,7 +133,7 @@ namespace Conveer
 
         /// <summary>
         /// Подмога боту, чтобы бой укладывался в нужное время: босс теряет здоровье не медленнее графика
-        /// (урон идёт обычным путём Run.DamageEnemy — фазы, неуязвимость между фазами и деление работают как в игре).
+        /// (урон идёт обычным путём Run.DamageEnemy – фазы, неуязвимость между фазами и деление работают как в игре).
         /// </summary>
         private static void Assist(Run run, float elapsed, float limit)
         {
@@ -152,9 +152,9 @@ namespace Conveer
         }
 
         /// <summary>
-        /// Витрина атак: комната босса на его этаже и в его биоме; босс по очереди показывает каждую свою атаку —
+        /// Витрина атак: комната босса на его этаже и в его биоме; босс по очереди показывает каждую свою атаку –
         /// сначала обычные (фаза 1), затем атаки ярости (фаза ярости). Бот-уклонист не стреляет, а уходит от атак;
-        /// герою возвращается здоровье, чтобы он не погиб, а попадания было видно. Над кадром — номер и название атаки.
+        /// герою возвращается здоровье, чтобы он не погиб, а попадания было видно. Над кадром – номер и название атаки.
         /// После каждой атаки комната очищается от остатков (пуль, зон, призванных врагов).
         /// </summary>
         public void AttackReel(Session s, string bossKey)
@@ -180,7 +180,7 @@ namespace Conveer
             BossEntity performer = boss;
             void Keep()
             {
-                // Свои атаки босс (и его части) не начинает — только те, что показывает витрина; герой не погибает.
+                // Свои атаки босс (и его части) не начинает – только те, что показывает витрина; герой не погибает.
                 if (!forced && !boss.InAttack) boss.AttackTimer = 99f;
                 foreach (var p in boss.Parts)
                     if (!p.Dead && (!forced || p != performer) && !p.InAttack) p.AttackTimer = 99f;
@@ -210,7 +210,7 @@ namespace Conveer
                 }
             }
 
-            // Вступление босса; герой встаёт ниже босса (в игре он входит у двери, здесь — в центре, под боссом).
+            // Вступление босса; герой встаёт ниже босса (в игре он входит у двери, здесь – в центре, под боссом).
             run.Player.Pos = run.Room.NearestFree(ClampIn(run, boss.Pos + new Vec2(0.6f, 4f)));
             Step(2.5f);
             var list = Run.PossibleAttacks(def);
@@ -226,9 +226,9 @@ namespace Conveer
                     boss.Raging = true;
                     s.Note("босс в ярости: фаза " + (boss.Phase + 1) + "/" + boss.PhaseCount);
                 }
-                // Многочастный босс: атаку ведёт та часть, чья она (глаз, рука, пасть, ядро), иначе — тело.
+                // Многочастный босс: атаку ведёт та часть, чья она (глаз, рука, пасть, ядро), иначе – тело.
                 performer = boss.Parts.FirstOrDefault(p => !p.Dead && p.Part.Attacks.Contains(a)) ?? boss;
-                // Герой — в нескольких шагах от того, кто бьёт, на свободной клетке.
+                // Герой – в нескольких шагах от того, кто бьёт, на свободной клетке.
                 if (Vec2.Distance(run.Player.Pos, performer.Pos) < 3f)
                 {
                     Vec2 away = run.Player.Pos - performer.Pos;
@@ -240,7 +240,7 @@ namespace Conveer
                 sub = English(info.Description);
                 string who = performer.Part != null ? ", бьёт " + Loc.T(performer.Part.Name) : "";
                 if (performer.Part != null) label += "  (" + performer.Part.Key.ToUpperInvariant() + ")";
-                s.Note($"атака {index}/{list.Count}: «{Loc.T(info.Name)}» ({a}){(rage ? ", ярость" : "")}{who} — {Loc.T(info.Description)}");
+                s.Note($"атака {index}/{list.Count}: «{Loc.T(info.Name)}» ({a}){(rage ? ", ярость" : "")}{who} – {Loc.T(info.Description)}");
                 Begin(run, performer, a);
                 forced = true;
                 Step(10f, () => !performer.InAttack);
@@ -259,8 +259,8 @@ namespace Conveer
 
         /// <summary>
         /// Весь бой с многочастным финалом: арена, глаза → руки → пасть → ядро. Бот уворачивается и стреляет в открытые
-        /// части; подмога снимает части так, чтобы ярус длился около <paramref name="perTier"/> секунд (урон — обычным путём,
-        /// поэтому все 10 фаз каждой части, щиты спящих частей и смена ярусов — как в игре). Затем трофей победы.
+        /// части; подмога снимает части так, чтобы ярус длился около <paramref name="perTier"/> секунд (урон – обычным путём,
+        /// поэтому все 10 фаз каждой части, щиты спящих частей и смена ярусов – как в игре). Затем трофей победы.
         /// </summary>
         public void FinalFight(Session s, string bossKey, float perTier)
         {
@@ -291,7 +291,7 @@ namespace Conveer
                     var target = body.Parts.Where(p => !p.Dead && Run.PartOpen(p) && p.Visible).OrderBy(p => Vec2.Distance(p.Pos, run.Player.Pos)).FirstOrDefault();
                     if (target != null) input.Shoot = (target.Pos - run.Player.Pos).Normalized;
                     run.Tick(input, Session.Dt);
-                    // Подмога: открытые части теряют здоровье равномерно, ярус — за perTier секунд.
+                    // Подмога: открытые части теряют здоровье равномерно, ярус – за perTier секунд.
                     foreach (var p in body.Parts.ToArray())
                         if (!p.Dead && Run.PartOpen(p) && !p.Invulnerable && p.Spawned <= 0f)
                             run.DamageEnemy(p, p.MaxHp * Session.Dt / perTier, TearFlags.None, Vec2.Zero);
@@ -362,10 +362,10 @@ namespace Conveer
             string t = Loc.T(ru);
             Loc.Current = prev;
             return t.Replace('×', 'x').Replace('«', '"').Replace('»', '"').Replace('“', '"').Replace('”', '"').Replace('’', '\'')
-                .Replace("—", "-").Replace("–", "-").Replace("…", "...").Replace(';', ',');
+                .Replace("–", "-").Replace("…", "...").Replace(';', ',');
         }
 
-        /// <summary>Подпись витрины: название атаки крупно, описание мельче (шрифт игры 3×5 — латиница).</summary>
+        /// <summary>Подпись витрины: название атаки крупно, описание мельче (шрифт игры 3×5 – латиница).</summary>
         private static void Caption(Frame f, string title, string desc)
         {
             int sc = Math.Max(2, f.H / 200), ds = Math.Max(1, sc * 2 / 3);
@@ -419,7 +419,7 @@ namespace Conveer
             run.Won = won;
             bool sting = s.Flow.RunFinished(run, cinemaFollows);
             if (!sting && !cinemaFollows) s.Sfx(won ? "revive" : "descend");
-            s.Note(won ? "победа в забеге" : "смерть — экран итогов");
+            s.Note(won ? "победа в забеге" : "смерть – экран итогов");
         }
 
         /// <summary>Экран итогов: затемнённый последний кадр, надпись; затем игрок уходит в Убежище.</summary>
@@ -674,13 +674,13 @@ namespace Conveer
                 {
                     Id = "final_" + key, Title = "Финал по частям · " + Loc.T(b.Name),
                     Expect = new[] { MusicCatalog.BossSlot(b) },
-                    Description = $"Арена «{key}»: тело у верхней стены, части убиваются по порядку — " + string.Join(" → ", b.Parts.Select(p => Loc.T(p.Name))) +
-                        $"; у каждой части {Run.PartPhases} фаз. Бот уворачивается и стреляет в открытые части, подмога держит темп. В конце — трофей.",
+                    Description = $"Арена «{key}»: тело у верхней стены, части убиваются по порядку – " + string.Join(" → ", b.Parts.Select(p => Loc.T(p.Name))) +
+                        $"; у каждой части {Run.PartPhases} фаз. Бот уворачивается и стреляет в открытые части, подмога держит темп. В конце – трофей.",
                     Shoot = (s, st) => st.FinalFight(s, key, 11f),
                 });
             }
 
-            // Витрины атак: по видео на каждого босса — все его атаки по очереди, с подписью.
+            // Витрины атак: по видео на каждого босса – все его атаки по очереди, с подписью.
             foreach (var b in BossDatabase.All.Concat(BossDatabase.MiniBosses).Distinct())
             {
                 if (BossDatabase.IsSplitChild(b)) continue;
@@ -698,7 +698,7 @@ namespace Conveer
             list.Add(new SceneDef
             {
                 Id = "death", Title = "Смерть → экран итогов → Убежище", Expect = new[] { "bg_cache", "sting_defeat", "hub" },
-                Description = "Герой погибает: музыка затихает, звучит джингл смерти; игрок уходит в Убежище — джингл сразу затихает, вступает тема базы.",
+                Description = "Герой погибает: музыка затихает, звучит джингл смерти; игрок уходит в Убежище – джингл сразу затихает, вступает тема базы.",
                 Shoot = (s, st) =>
                 {
                     var run = st.NewRun(1, null, 202u);
@@ -726,7 +726,7 @@ namespace Conveer
                 },
             });
 
-            // Ролики клеток и концовка: как после победы в игре — ролик, итоги с джинглом, Убежище.
+            // Ролики клеток и концовка: как после победы в игре – ролик, итоги с джинглом, Убежище.
             for (int n = 1; n <= MemoryCells.Max; n++)
             {
                 int cell = n;

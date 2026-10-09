@@ -63,8 +63,8 @@ namespace Conveer
         }
 
         /// <summary>
-        /// Спрайт шима (как Sprite в Unity): центр в пикселях кадра, unit — пикселей на клетку,
-        /// масштаб, поворот, оттенок. Без поворота — быстрый путь ближайшего соседа.
+        /// Спрайт шима (как Sprite в Unity): центр в пикселях кадра, unit – пикселей на клетку,
+        /// масштаб, поворот, оттенок. Без поворота – быстрый путь ближайшего соседа.
         /// </summary>
         public void Draw(Sprite s, float px, float py, float unit, float sx, float sy, float angle, Color tint, bool flipX = false)
         {

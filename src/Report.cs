@@ -101,7 +101,7 @@ namespace Conveer
                     var seen = new HashSet<string>();
                     while (slot != null && seen.Add(slot) && DiskLibrary.FindFile(cfg.MusicDir, slot) == null) slot = MusicCatalog.Get(slot)?.Fallback;
                     ti.Plays = slot != null && DiskLibrary.FindFile(cfg.MusicDir, slot) != null ? slot : "процедурная петля";
-                    ti.Warnings.Add("нет файла — звучит " + ti.Plays);
+                    ti.Warnings.Add("нет файла – звучит " + ti.Plays);
                     list.Add(ti);
                     continue;
                 }
@@ -110,25 +110,25 @@ namespace Conveer
                 string ext = System.IO.Path.GetExtension(ti.Path).TrimStart('.').ToLowerInvariant();
                 string codec = ti.Codec.Split(',')[0];
                 if (ext == "ogg" && codec != "vorbis" && codec != "opus")
-                    ti.Warnings.Add($"внутри .ogg — {codec.ToUpperInvariant()} (Unity читает; шов петли сглаживает кроссфейд, но лучше настоящий OGG/WAV)");
+                    ti.Warnings.Add($"внутри .ogg – {codec.ToUpperInvariant()} (Unity читает; шов петли сглаживает кроссфейд, но лучше настоящий OGG/WAV)");
                 if (cfg.AnalyzeTracks)
                 {
                     var (lufs, peak) = ff.Loudness(ti.Path);
                     ti.Lufs = lufs;
                     ti.Peak = peak;
                     if (!double.IsNaN(lufs) && (lufs > -11 || lufs < -22)) ti.Warnings.Add($"громкость {lufs:0.0} LUFS (рекомендуется около −16)");
-                    if (!double.IsNaN(peak) && peak > 1.0) ti.Warnings.Add($"пик {peak:0.0} dBTP — выше 0 дБ, при импорте возможны щелчки (рекомендуется ≤ −1)");
+                    if (!double.IsNaN(peak) && peak > 1.0) ti.Warnings.Add($"пик {peak:0.0} dBTP – выше 0 дБ, при импорте возможны щелчки (рекомендуется ≤ −1)");
                 }
                 if (cfg.AnalyzeTracks && t.Group != MusicCatalog.Group.Sting) EnvelopeChecks(ff, t, ti);
                 if (t.Group == MusicCatalog.Group.Sting && ti.Duration > 15)
-                    ti.Warnings.Add($"джингл {ti.Duration:0} с — в игре он короткий: уходит, как только вступает музыка или игрок покидает экран (рекомендуется 3–12 с)");
+                    ti.Warnings.Add($"джингл {ti.Duration:0} с – в игре он короткий: уходит, как только вступает музыка или игрок покидает экран (рекомендуется 3–12 с)");
                 if (t.Group == MusicCatalog.Group.Cinema)
                 {
                     float need = CinemaLength(t.File);
-                    if (need > 0 && ti.Duration < need) ti.Warnings.Add($"трек {ti.Duration:0.0} с короче ролика ({need:0.0} с) — в конце он начнётся заново");
+                    if (need > 0 && ti.Duration < need) ti.Warnings.Add($"трек {ti.Duration:0.0} с короче ролика ({need:0.0} с) – в конце он начнётся заново");
                 }
                 if ((t.Group == MusicCatalog.Group.Background || t.Group == MusicCatalog.Group.Menu || t.Group == MusicCatalog.Group.Boss) && ti.Duration < 60)
-                    ti.Warnings.Add($"всего {ti.Duration:0} с — петля будет часто повторяться");
+                    ti.Warnings.Add($"всего {ti.Duration:0} с – петля будет часто повторяться");
                 list.Add(ti);
             }
 
@@ -155,7 +155,7 @@ namespace Conveer
 
         /// <summary>
         /// Тихое вступление и долгое затухание: окна 0,5 с тише средней громкости трека на 12 дБ.
-        /// Бою с боссом нужно сразу звучать, а петле — не проваливаться на шве.
+        /// Бою с боссом нужно сразу звучать, а петле – не проваливаться на шве.
         /// </summary>
         private static void EnvelopeChecks(Ffmpeg ff, MusicCatalog.Track t, TrackInfo ti)
         {
@@ -169,11 +169,11 @@ namespace Conveer
             ti.Intro = intro;
             ti.Tail = tail;
             if (t.Group == MusicCatalog.Group.Boss && intro > 2)
-                ti.Warnings.Add($"тихое вступление {intro:0.#} с — бой с боссом начнётся почти в тишине (рекомендуется ≤ 2 с)");
+                ti.Warnings.Add($"тихое вступление {intro:0.#} с – бой с боссом начнётся почти в тишине (рекомендуется ≤ 2 с)");
             else if ((t.Group == MusicCatalog.Group.Background || t.Group == MusicCatalog.Group.Menu) && intro > 6)
-                ti.Warnings.Add($"тихое вступление {intro:0.#} с — после смены биома или экрана сначала почти тишина");
+                ti.Warnings.Add($"тихое вступление {intro:0.#} с – после смены биома или экрана сначала почти тишина");
             if (t.Group != MusicCatalog.Group.Cinema && tail > 6)
-                ti.Warnings.Add($"затухание в конце {tail:0.#} с — на шве петли будет провал громкости (игра сводит за 3 с)");
+                ti.Warnings.Add($"затухание в конце {tail:0.#} с – на шве петли будет провал громкости (игра сводит за 3 с)");
         }
 
         private static float CinemaLength(string slot)
@@ -216,13 +216,13 @@ namespace Conveer
             md.AppendLine("| Файл | Группа | Длина | Кодек | LUFS | Пик dBTP | Тихое начало / конец, с | Замечания |");
             md.AppendLine("|---|---|---|---|---|---|---|---|");
             foreach (var t in tracks)
-                md.AppendLine($"| `{t.File}` | {t.Group} | {(t.Path == null ? "—" : Time(t.Duration))} | {t.Codec ?? "—"} | {Num(t.Lufs)} | {Num(t.Peak)} | {Num(t.Intro)} / {Num(t.Tail)} | {string.Join("; ", t.Warnings)} |");
+                md.AppendLine($"| `{t.File}` | {t.Group} | {(t.Path == null ? "–" : Time(t.Duration))} | {t.Codec ?? "–"} | {Num(t.Lufs)} | {Num(t.Peak)} | {Num(t.Intro)} / {Num(t.Tail)} | {string.Join("; ", t.Warnings)} |");
             md.AppendLine();
             md.AppendLine("## Видео");
             md.AppendLine();
             foreach (var r in results)
             {
-                md.AppendLine($"### {r.Scene.Title} — `{r.Scene.Id}`");
+                md.AppendLine($"### {r.Scene.Title} – `{r.Scene.Id}`");
                 md.AppendLine();
                 md.AppendLine(r.Scene.Description);
                 md.AppendLine();
@@ -243,8 +243,8 @@ namespace Conveer
             File.WriteAllText(Path.Combine(outDir, "index.html"), Html(cfg, tracks, results, ffVersion), new UTF8Encoding(false));
         }
 
-        private static string Time(double s) => double.IsNaN(s) ? "—" : $"{(int)(s / 60)}:{(int)(s % 60):00}";
-        private static string Num(double v) => double.IsNaN(v) ? "—" : v.ToString("0.0", CultureInfo.InvariantCulture);
+        private static string Time(double s) => double.IsNaN(s) ? "–" : $"{(int)(s / 60)}:{(int)(s % 60):00}";
+        private static string Num(double v) => double.IsNaN(v) ? "–" : v.ToString("0.0", CultureInfo.InvariantCulture);
         private static string H(string s) => WebUtility.HtmlEncode(s ?? "");
 
         private static string Html(Config cfg, List<TrackInfo> tracks, List<SceneResult> results, string ffVersion)
@@ -280,7 +280,7 @@ video{width:100%;border-radius:8px;background:#000;margin:10px 0}details{margin-
             }
             sb.Append("<h2>Треки</h2><table><tr><th>Файл</th><th>Группа</th><th>Длина</th><th>Кодек</th><th>LUFS</th><th>Пик</th><th>Тихо в начале / конце, с</th><th>Замечания</th></tr>");
             foreach (var t in tracks)
-                sb.Append($"<tr><td><code>{H(t.File)}</code></td><td>{H(t.Group)}</td><td>{(t.Path == null ? "—" : Time(t.Duration))}</td><td>{H(t.Codec ?? "—")}</td><td>{Num(t.Lufs)}</td><td>{Num(t.Peak)}</td><td>{Num(t.Intro)} / {Num(t.Tail)}</td><td class=w>{H(string.Join("; ", t.Warnings))}</td></tr>");
+                sb.Append($"<tr><td><code>{H(t.File)}</code></td><td>{H(t.Group)}</td><td>{(t.Path == null ? "–" : Time(t.Duration))}</td><td>{H(t.Codec ?? "–")}</td><td>{Num(t.Lufs)}</td><td>{Num(t.Peak)}</td><td>{Num(t.Intro)} / {Num(t.Tail)}</td><td class=w>{H(string.Join("; ", t.Warnings))}</td></tr>");
             sb.Append("</table></main></body></html>");
             return sb.ToString();
         }

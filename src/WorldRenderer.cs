@@ -12,7 +12,7 @@ using UnityEngine;
 namespace Conveer
 {
     /// <summary>
-    /// Кадр забега без Unity: плитки и предметы — процедурные спрайты игры (SpriteFactory), герои, враги и боссы —
+    /// Кадр забега без Unity: плитки и предметы – процедурные спрайты игры (SpriteFactory), герои, враги и боссы –
     /// листы пиксельной студии, как в WorldView. Статичный слой комнаты (пол, стены, двери, препятствия)
     /// рисуется один раз и только перерисовывается при изменениях; камера плавно следует за героем.
     /// </summary>
@@ -38,7 +38,7 @@ namespace Conveer
         private static Color Lerp(Color a, Color b, float t) => new Color(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t);
         private static Color Boost(Color c) => new Color(Math.Min(1f, c.r * 1.45f + 0.05f), Math.Min(1f, c.g * 1.45f + 0.05f), Math.Min(1f, c.b * 1.45f + 0.05f), 1f);
 
-        /// <summary>Сбросить камеру (новая сцена или новая комната — без «проезда» через полкарты).</summary>
+        /// <summary>Сбросить камеру (новая сцена или новая комната – без «проезда» через полкарты).</summary>
         public void ResetCamera() => _camX = float.NaN;
 
         public void Render(Run run, Frame img, float dt)
@@ -47,7 +47,7 @@ namespace Conveer
             _u = ArenaBody(run) != null ? Math.Min(_base, (int)(img.H / (room.H + 3.2f))) : _base;
             float U = _u;
             float vw = img.W / U, vh = img.H / U;
-            // Камера: комната, которая помещается в кадр, — по центру; большая — за героем, но не за стенами.
+            // Камера: комната, которая помещается в кадр, – по центру; большая – за героем, но не за стенами.
             float tx = room.W + 2 <= vw ? (room.W - vw) / 2f : Math.Max(-1f, Math.Min(run.Player.Pos.X - vw / 2f, room.W + 1 - vw));
             float ty = room.H + 2 <= vh ? (room.H - vh) / 2f : Math.Max(-1f, Math.Min(run.Player.Pos.Y - vh / 2f, room.H + 1 - vh));
             if (float.IsNaN(_camX) || _camRun != run || _staticRoom != room)
@@ -153,7 +153,7 @@ namespace Conveer
                     case EntityType.Trapdoor: col = Color.white; ord = -80; break;
                     case EntityType.Familiar: col = Color.white; height = 0.3f; break;
                     case EntityType.Boss:
-                        // Тело многочастного босса — позади своих частей (глаза висят выше его середины).
+                        // Тело многочастного босса – позади своих частей (глаза висят выше его середины).
                         if (((BossEntity)e).Parts.Count > 0) ord = -4f;
                         break;
                     case EntityType.Machine:
@@ -227,7 +227,7 @@ namespace Conveer
                 bool fl = flip;
                 if (e is BossEntity pe && (pe.Part != null || pe.Parts.Count > 0))
                 {
-                    // Части не разворачиваются к герою: правые — отражение левых; спящие — под голубым щитом.
+                    // Части не разворачиваются к герою: правые – отражение левых; спящие – под голубым щитом.
                     fl = pe.Part != null && pe.Part.Mirror;
                     if (pe.Part != null && !Run.PartOpen(pe) && pe.Spawned <= 0f)
                     {
@@ -237,7 +237,7 @@ namespace Conveer
                         draws.Add((ord - 0.002f, () => img.Draw(_f.Get("glow"), PX(en.Pos.X), PY(en.Pos.Y - hh * 0.6f), U, gs, gs, 0, sh)));
                     }
                 }
-                bool noShadow = e is BossEntity ns && (ns.Parts.Count > 0 || (ns.Part != null && ns.Part.Kind != BossPartKind.Hand));
+                bool noShadow = e is BossEntity ns && (ns.Parts.Count > 0 || (ns.Part != null && !ns.Part.Roams));
                 if (e.Type != EntityType.Effect && e.Type != EntityType.Trapdoor && e.Type != EntityType.Projectile && !decor && !noShadow)
                     draws.Add((ord - 0.001f, () => img.Draw(_f.Get("shadow"), PX(en.Pos.X), PY(en.Pos.Y + 0.3f * sc), U, sc * 0.8f, sc * 0.8f, 0, new Color(1, 1, 1, 0.9f))));
                 var spr = studio ?? _f.Get(sp);
@@ -253,7 +253,7 @@ namespace Conveer
         private const float Rad2Deg = 180f / (float)Math.PI;
 
         /// <summary>
-        /// Зона атаки босса, как WorldView.DrawZone: пока предупреждает — мигает всё чаще и плотнее,
+        /// Зона атаки босса, как WorldView.DrawZone: пока предупреждает – мигает всё чаще и плотнее,
         /// в момент удара вспыхивает белым, затем держится, пока активна. Лежит на полу под всеми.
         /// </summary>
         private void DrawZone(Run run, Zone z, Frame img, List<(float order, Action act)> draws, float camX, float camY)
@@ -275,7 +275,7 @@ namespace Conveer
                 c.a = since < 0.08f ? 1f : 0.7f;
             }
             float ord = z.Struck ? -64f : -65f;
-            // Большие кольца и секторы выходят за стены — рисуем их попиксельно в пределах комнаты (как WorldView).
+            // Большие кольца и секторы выходят за стены – рисуем их попиксельно в пределах комнаты (как WorldView).
             bool big = (z.Shape == ZoneShape.Sector || z.Shape == ZoneShape.Ring) &&
                        (z.Pos.X - z.R < 0f || z.Pos.Y - z.R < 0f || z.Pos.X + z.R > run.Room.W || z.Pos.Y + z.R > run.Room.H);
             if (big)
@@ -383,7 +383,7 @@ namespace Conveer
                 }
         }
 
-        /// <summary>Тело многочастного босса в комнате (null — его нет).</summary>
+        /// <summary>Тело многочастного босса в комнате (null – его нет).</summary>
         private static BossEntity ArenaBody(Run run)
         {
             foreach (var e in run.Room.Entities)
@@ -395,8 +395,9 @@ namespace Conveer
         private static void DrawPartsHud(BossEntity body, Frame img, int s)
         {
             int bw = img.W * 6 / 10, bx = (img.W - bw) / 2, by = 10 * s, bh = 6 * s;
-            string[] tiers = { "EYES", "HANDS", "MAW", "CORE" };
-            string head = body.BossDef.Key.ToUpperInvariant() + "  TIER " + body.ActiveTier + "/" + body.PhaseCount + ": " + tiers[Math.Max(0, Math.Min(3, body.ActiveTier - 1))];
+            // Ярус – по виду его частей (шрифт кадра – латиница).
+            string tier = body.Parts.Where(p => p.Part.Tier == body.ActiveTier).Select(p => p.Part.Kind.ToString().ToUpperInvariant()).FirstOrDefault() ?? "";
+            string head = body.BossDef.Key.ToUpperInvariant() + "  TIER " + body.ActiveTier + "/" + body.PhaseCount + ": " + tier;
             img.Text(head, bx, by, s, new Color(1f, 0.9f, 0.9f));
             by += 8 * s;
             var open = body.Parts.Where(p => !p.Dead && Run.PartOpen(p)).ToList();
@@ -439,7 +440,7 @@ namespace Conveer
                 _staticHash = hash;
                 _static = BuildStatic(run);
             }
-            // Окно кэша (начало кэша — клетка (−1; −1) мира) копируется в кадр построчно.
+            // Окно кэша (начало кэша – клетка (−1; −1) мира) копируется в кадр построчно.
             var bg = ToColor(run.Biome.FogColor);
             img.Clear(bg.r * 0.35f, bg.g * 0.35f, bg.b * 0.35f);
             int ox = (int)Math.Round((camX + 1f) * U), oy = (int)Math.Round((camY + 1f) * U);
@@ -549,7 +550,7 @@ namespace Conveer
                 string key = b.Part != null ? ArtLibrary.PartKeyFor(b.BossDef, b.Part) : b.IsSegment ? ArtLibrary.SegmentKeyFor(b.BossDef) : "boss:" + b.BossDef.Key;
                 var clip = b.InAttack ? Clips.Of(b.CurrentAttack) : b.Telegraph > 0.05f ? Clip.Attack : b.Raging ? Clip.Rage : b.Vel.LengthSq > 0.3f ? Clip.Move : Clip.Idle;
                 if (b.Spawned > 0f) return ArtFrame(key, Clip.Spawn, (int)((1f - Math.Min(1f, b.Spawned / 1.4f)) * 7.99f));
-                // Тело вторит части, которая сейчас бьёт: на его экране — знак этой атаки.
+                // Тело вторит части, которая сейчас бьёт: на его экране – знак этой атаки.
                 if (b.Parts.Count > 0 && !b.InAttack)
                     foreach (var p in b.Parts)
                         if (!p.Dead && p.InAttack) { clip = Clips.Of(p.CurrentAttack); break; }
@@ -592,7 +593,7 @@ namespace Conveer
                 DrawPartsHud(boss, img, s);
                 return;
             }
-            // Сверху по центру: снизу слева — панель музыки конвейера.
+            // Сверху по центру: снизу слева – панель музыки конвейера.
             int bw = img.W * 5 / 10, bh = 7 * s, bx = (img.W - bw) / 2, by = 10 * s;
             img.Fill(bx - s, by - s, bw + 2 * s, bh + 2 * s, 0.02f, 0.02f, 0.05f, 0.85f);
             float k = Math.Max(0f, Math.Min(1f, boss.Hp / Math.Max(1f, boss.MaxHp)));

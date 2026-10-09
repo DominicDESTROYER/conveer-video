@@ -62,13 +62,13 @@ namespace Conveer
             return (ds / 600).ToString("00") + ":" + (ds % 600 / 10).ToString("00") + "." + (ds % 10);
         }
 
-        public void Note(string what) => Log.Add(Stamp(_t) + "  — " + what);
+        public void Note(string what) => Log.Add(Stamp(_t) + "  – " + what);
 
         public void Sfx(string key) => _mixer.Sfx(key);
 
         /// <summary>
-        /// Такт 1/60 с: логика сцены, шаг режиссёра музыки, сведение звука; когда подходит время кадра —
-        /// draw рисует кадр, поверх — панель музыки, кадр уходит в ffmpeg.
+        /// Такт 1/60 с: логика сцены, шаг режиссёра музыки, сведение звука; когда подходит время кадра –
+        /// draw рисует кадр, поверх – панель музыки, кадр уходит в ffmpeg.
         /// </summary>
         public void Tick(Action logic, Action<Frame> draw)
         {
@@ -102,7 +102,7 @@ namespace Conveer
             int s = Math.Max(1, Frame.H / 240);
             var f = Frame;
             string head = Id.ToUpperInvariant() + "  " + Stamp(_t);
-            // Справа внизу: сверху по центру — полоса здоровья босса и подписи сцен.
+            // Справа внизу: сверху по центру – полоса здоровья босса и подписи сцен.
             f.Text(head, f.W - Frame.TextWidth(head, s) - 6 * s, f.H - 10 * s, s, new Color(0.75f, 0.9f, 1f));
 
             var lines = new List<(string text, Color c, float vol)>();

@@ -7,7 +7,7 @@ using Tokenfall.Core.Simulation;
 namespace Conveer
 {
     /// <summary>
-    /// Бот-уклонист для витрины атак (тот же, что в BossAttackTests): не стреляет, а только уходит от опасности —
+    /// Бот-уклонист для витрины атак (тот же, что в BossAttackTests): не стреляет, а только уходит от опасности –
     /// зон (чем ближе удар, тем страшнее), пуль с упреждением на полсекунды, лучей и касания врагов.
     /// Так в видео видно, что от каждой атаки можно увернуться и где у неё проход.
     /// </summary>
@@ -74,14 +74,14 @@ namespace Conveer
             foreach (var dir in Dirs)
             {
                 float worst = 0f;
-                foreach (float step in new[] { 0.12f, 0.28f, 0.45f })
-                    worst = Math.Max(worst, Danger(run, p + dir * 4.5f * step));
+                // Ближние точки пути весят меньше: пройти краем зоны, которая ещё не ударила, можно – стоять в ней нельзя.
+                worst = Math.Max(0.6f * Danger(run, p + dir * 4.5f * 0.12f), Math.Max(0.85f * Danger(run, p + dir * 4.5f * 0.28f), Danger(run, p + dir * 4.5f * 0.45f)));
                 // Лёгкая инерция: при равной опасности бот не дёргается туда-сюда каждый кадр.
                 if (Vec2.DistanceSq(dir, _last) < 1e-6f) worst -= 0.5f;
                 if (worst < best - 0.01f) { best = worst; pick = dir; }
             }
             _last = pick;
-            // Смотрит на босса — так видно, куда он целится.
+            // Смотрит на босса – так видно, куда он целится.
             Vec2 aim = Vec2.Zero;
             foreach (var e in run.Room.Entities)
                 if (e is BossEntity b && !b.Dead && !b.IsSegment) { aim = (b.Pos - p).Normalized; break; }

@@ -7,7 +7,7 @@ namespace Conveer
 {
     /// <summary>
     /// Настройки конвейера (conveer.json). Относительные пути считаются от папки, где лежит conveer.json,
-    /// поэтому "gameRoot": "../game-token" — это папка игры рядом с папкой конвейера.
+    /// поэтому "gameRoot": "../game-token" – это папка игры рядом с папкой конвейера.
     /// </summary>
     public sealed class Config
     {
@@ -20,7 +20,7 @@ namespace Conveer
         public int Fps = 30;
         public int Crf = 20;
         public string Preset = "veryfast";
-        public string Subtitles = "burn";     // burn — вшить в кадр, soft — отдельной дорожкой, off — без субтитров
+        public string Subtitles = "burn";     // burn – вшить в кадр, soft – отдельной дорожкой, off – без субтитров
         public string Language = "ru";
         public float MasterVolume = 0.9f, MusicVolume = 0.5f, SfxVolume = 0.8f;
         public readonly Dictionary<string, float> Seconds = new Dictionary<string, float>
@@ -48,7 +48,7 @@ namespace Conveer
             var c = new Config();
             if (path == null)
             {
-                // conveer.json ищется в текущей папке и выше — запуск из bin/ тоже работает.
+                // conveer.json ищется в текущей папке и выше – запуск из bin/ тоже работает.
                 var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
                 while (dir != null && !File.Exists(Path.Combine(dir.FullName, "conveer.json"))) dir = dir.Parent;
                 if (dir == null) return c;

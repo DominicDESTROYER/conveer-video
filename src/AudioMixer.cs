@@ -7,7 +7,7 @@ namespace Conveer
 {
     /// <summary>
     /// Треки для режиссёра музыки с диска: файлы Assets/Resources/Music игры (как Resources.Load: имя без расширения,
-    /// варианты name_2 … name_9) и процедурные петли ChipSynth. PCM декодирует ffmpeg; в памяти — несколько последних треков.
+    /// варианты name_2 … name_9) и процедурные петли ChipSynth. PCM декодирует ffmpeg; в памяти – несколько последних треков.
     /// </summary>
     public sealed class DiskLibrary : IMusicLibrary
     {
@@ -111,7 +111,7 @@ namespace Conveer
     }
 
     /// <summary>
-    /// Сведение звука сцены: голоса режиссёра музыки (как AudioSynth в игре — та же громкость, кроссфейды
+    /// Сведение звука сцены: голоса режиссёра музыки (как AudioSynth в игре – та же громкость, кроссфейды
     /// и позиции) плюс звуковые эффекты событий. Пишет WAV и считает пики для отчёта.
     /// </summary>
     public sealed class AudioMixer
@@ -157,7 +157,7 @@ namespace Conveer
             Array.Resize(ref _buf, (int)n);
         }
 
-        /// <summary>Звуковой эффект с текущего момента (повтор того же звука чаще 45 мс глушится — как в игре).</summary>
+        /// <summary>Звуковой эффект с текущего момента (повтор того же звука чаще 45 мс глушится – как в игре).</summary>
         public void Sfx(string key)
         {
             if (string.IsNullOrEmpty(key)) return;

@@ -177,10 +177,13 @@ namespace Conveer
             var dodger = new Dodger();
             string label = def.Key.ToUpperInvariant(), sub = "";
             bool forced = false;
+            BossEntity performer = boss;
             void Keep()
             {
-                // Свои атаки босс не начинает — только те, что показывает витрина; герой не погибает.
+                // Свои атаки босс (и его части) не начинает — только те, что показывает витрина; герой не погибает.
                 if (!forced && !boss.InAttack) boss.AttackTimer = 99f;
+                foreach (var p in boss.Parts)
+                    if (!p.Dead && (!forced || p != performer) && !p.InAttack) p.AttackTimer = 99f;
                 run.Health.RedMax = Math.Max(run.Health.RedMax, 12);
                 run.Health.Red = run.Health.RedMax;
             }
@@ -223,23 +226,27 @@ namespace Conveer
                     boss.Raging = true;
                     s.Note("босс в ярости: фаза " + (boss.Phase + 1) + "/" + boss.PhaseCount);
                 }
-                // Герой — в нескольких шагах от босса, на свободной клетке.
-                if (Vec2.Distance(run.Player.Pos, boss.Pos) < 3f)
+                // Многочастный босс: атаку ведёт та часть, чья она (глаз, рука, пасть, ядро), иначе — тело.
+                performer = boss.Parts.FirstOrDefault(p => !p.Dead && p.Part.Attacks.Contains(a)) ?? boss;
+                // Герой — в нескольких шагах от того, кто бьёт, на свободной клетке.
+                if (Vec2.Distance(run.Player.Pos, performer.Pos) < 3f)
                 {
-                    Vec2 away = run.Player.Pos - boss.Pos;
+                    Vec2 away = run.Player.Pos - performer.Pos;
                     if (away.Length < 0.5f) away = new Vec2(0.3f, 1f);
-                    run.Player.Pos = run.Room.NearestFree(ClampIn(run, boss.Pos + away.Normalized * 4f));
+                    run.Player.Pos = run.Room.NearestFree(ClampIn(run, performer.Pos + away.Normalized * 4f));
                     run.Player.Vel = Vec2.Zero;
                 }
                 label = $"{index}/{list.Count}  {English(info.Name)}" + (rage ? "  [RAGE]" : "");
                 sub = English(info.Description);
-                s.Note($"атака {index}/{list.Count}: «{Loc.T(info.Name)}» ({a}){(rage ? ", ярость" : "")} — {Loc.T(info.Description)}");
-                Begin(run, boss, a);
+                string who = performer.Part != null ? ", бьёт " + Loc.T(performer.Part.Name) : "";
+                if (performer.Part != null) label += "  (" + performer.Part.Key.ToUpperInvariant() + ")";
+                s.Note($"атака {index}/{list.Count}: «{Loc.T(info.Name)}» ({a}){(rage ? ", ярость" : "")}{who} — {Loc.T(info.Description)}");
+                Begin(run, performer, a);
                 forced = true;
-                Step(10f, () => !boss.InAttack);
+                Step(10f, () => !performer.InAttack);
                 forced = false;
-                boss.AttackTimer = 99f;
-                if (boss.InAttack) s.Note("атака не закончилась за 10 с");
+                performer.AttackTimer = 99f;
+                if (performer.InAttack) s.Note("атака не закончилась за 10 с");
                 // Хвост атаки: догоняющие пули и зоны.
                 Step(1.4f);
                 Clean(run, boss);
@@ -248,6 +255,65 @@ namespace Conveer
             label = def.Key.ToUpperInvariant() + "  ALL " + list.Count + " ATTACKS SHOWN";
             sub = "";
             Step(1.5f);
+        }
+
+        /// <summary>
+        /// Весь бой с многочастным финалом: арена, глаза → руки → пасть → ядро. Бот уворачивается и стреляет в открытые
+        /// части; подмога снимает части так, чтобы ярус длился около <paramref name="perTier"/> секунд (урон — обычным путём,
+        /// поэтому все 10 фаз каждой части, щиты спящих частей и смена ярусов — как в игре). Затем трофей победы.
+        /// </summary>
+        public void FinalFight(Session s, string bossKey, float perTier)
+        {
+            var def = BossDatabase.Get(bossKey);
+            var (stage, biome) = WhereIs(def);
+            var run = NewRun(stage, biome, (uint)(Rng.Hash(bossKey + ":fight") & 0x7FFFFFFF) | 1u);
+            run.ShieldTime = 0f;
+            s.Flow.RunStarted(run);
+            var node = run.Floor.Rooms.First(r => r.Type == RoomType.Boss && !r.OffGrid);
+            node.Revealed = true;
+            run.EnterRoom(node.Index, node.Doors[0].Pair);
+            OnEvents(s, run);
+            run.Events.Clear();
+            World.ResetCamera();
+            var body = run.Room.Entities.OfType<BossEntity>().First(b => b.Parts.Count > 0);
+            s.Note($"арена {bossKey}: {run.Room.W}×{run.Room.H}, частей {body.Parts.Count}");
+            var dodger = new Dodger();
+            int tier = body.ActiveTier;
+            float limit = perTier * (body.PhaseCount + 1) + 20f, t = 0f;
+            int n = (int)Math.Round(limit / Session.Dt);
+            for (int i = 0; i < n && !run.Room.Cleared; i++)
+            {
+                s.Tick(() =>
+                {
+                    run.Health.RedMax = Math.Max(run.Health.RedMax, 12);
+                    run.Health.Red = run.Health.RedMax;
+                    var input = dodger.Next(run);
+                    var target = body.Parts.Where(p => !p.Dead && Run.PartOpen(p) && p.Visible).OrderBy(p => Vec2.Distance(p.Pos, run.Player.Pos)).FirstOrDefault();
+                    if (target != null) input.Shoot = (target.Pos - run.Player.Pos).Normalized;
+                    run.Tick(input, Session.Dt);
+                    // Подмога: открытые части теряют здоровье равномерно, ярус — за perTier секунд.
+                    foreach (var p in body.Parts.ToArray())
+                        if (!p.Dead && Run.PartOpen(p) && !p.Invulnerable && p.Spawned <= 0f)
+                            run.DamageEnemy(p, p.MaxHp * Session.Dt / perTier, TearFlags.None, Vec2.Zero);
+                    if (body.ActiveTier != tier && !body.Dead)
+                    {
+                        tier = body.ActiveTier;
+                        s.Note("ярус " + tier + "/" + body.PhaseCount + ": " + string.Join(", ", body.Parts.Where(p => p.Part.Tier == tier).Select(p => Loc.T(p.Part.Name))));
+                    }
+                    foreach (var e in run.Events)
+                        if (e.Type == GameEventType.Message && e.Text != null && (e.Text.Contains("Уничтожено") || e.Text.Contains("Destroyed"))) s.Note(e.Text);
+                    OnEvents(s, run);
+                    run.Events.Clear();
+                    if (!run.Over) s.Flow.Tick(run);
+                    t += Session.Dt;
+                }, f =>
+                {
+                    World.Render(run, f, FrameDt);
+                    _last.CopyFrom(f);
+                });
+            }
+            s.Note(run.Room.Cleared ? "босс повержен за " + t.ToString("0") + " с" : "бой не закончился за отведённое время");
+            Play(s, run, null, 6f);
         }
 
         private static Vec2 ClampIn(Run run, Vec2 p) => new Vec2(Math.Max(1.5f, Math.Min(run.Room.W - 1.5f, p.X)), Math.Max(1.5f, Math.Min(run.Room.H - 1.5f, p.Y)));
@@ -269,6 +335,7 @@ namespace Conveer
             b.AuxVel = Vec2.Zero;
             b.AuxPath.Clear();
             b.AuxZone = null;
+            b.AuxEnts.Clear();
             run.Events.Add(new GameEvent { Type = GameEventType.BossAttack, Pos = b.Pos, Key = a.ToString() });
         }
 
@@ -597,6 +664,20 @@ namespace Conveer
                 if (shown.Contains(b.Key) || BossDatabase.IsSplitChild(b)) continue;
                 if (DiskLibrary.FindFile(cfg.MusicDir, "boss_" + b.Key) == null) continue;
                 list.Add(BossScene("boss_" + b.Key, b, "Личный трек босса · " + b.Key));
+            }
+
+            // Многочастный финал целиком: все части по ярусам, по 10 фаз у каждой.
+            foreach (var b in BossDatabase.All.Where(x => x.HasParts))
+            {
+                var key = b.Key;
+                list.Add(new SceneDef
+                {
+                    Id = "final_" + key, Title = "Финал по частям · " + Loc.T(b.Name),
+                    Expect = new[] { MusicCatalog.BossSlot(b) },
+                    Description = $"Арена «{key}»: тело у верхней стены, части убиваются по порядку — " + string.Join(" → ", b.Parts.Select(p => Loc.T(p.Name))) +
+                        $"; у каждой части {Run.PartPhases} фаз. Бот уворачивается и стреляет в открытые части, подмога держит темп. В конце — трофей.",
+                    Shoot = (s, st) => st.FinalFight(s, key, 11f),
+                });
             }
 
             // Витрины атак: по видео на каждого босса — все его атаки по очереди, с подписью.

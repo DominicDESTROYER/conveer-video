@@ -20,7 +20,9 @@ namespace Conveer
     {
         private readonly SpriteFactory _f = new SpriteFactory();
         private readonly Dictionary<string, Sprite> _art = new Dictionary<string, Sprite>();
-        private readonly int _u;
+        private readonly int _base;
+        /// <summary>Пикселей на клетку в текущем кадре: на арене многочастного босса камера отъезжает, чтобы влезла вся комната.</summary>
+        private int _u;
         private Frame _static;
         private RoomRuntime _staticRoom;
         private long _staticHash;
@@ -29,7 +31,7 @@ namespace Conveer
 
         public WorldRenderer(int unit)
         {
-            _u = unit;
+            _base = _u = unit;
         }
 
         private static Color ToColor(uint argb) => new Color(((argb >> 16) & 0xFF) / 255f, ((argb >> 8) & 0xFF) / 255f, (argb & 0xFF) / 255f, ((argb >> 24) & 0xFF) / 255f);
@@ -42,6 +44,7 @@ namespace Conveer
         public void Render(Run run, Frame img, float dt)
         {
             var room = run.Room;
+            _u = ArenaBody(run) != null ? Math.Min(_base, (int)(img.H / (room.H + 3.2f))) : _base;
             float U = _u;
             float vw = img.W / U, vh = img.H / U;
             // Камера: комната, которая помещается в кадр, — по центру; большая — за героем, но не за стенами.
@@ -149,6 +152,10 @@ namespace Conveer
                     }
                     case EntityType.Trapdoor: col = Color.white; ord = -80; break;
                     case EntityType.Familiar: col = Color.white; height = 0.3f; break;
+                    case EntityType.Boss:
+                        // Тело многочастного босса — позади своих частей (глаза висят выше его середины).
+                        if (((BossEntity)e).Parts.Count > 0) ord = -4f;
+                        break;
                     case EntityType.Machine:
                         col = Color.white;
                         if (((Machine)e).Kind == MachineKind.Decor && ((Machine)e).Flat) ord = -70;
@@ -218,7 +225,20 @@ namespace Conveer
                 Color cl = col;
                 float sc = scale, hh = height, an = angle;
                 bool fl = flip;
-                if (e.Type != EntityType.Effect && e.Type != EntityType.Trapdoor && e.Type != EntityType.Projectile && !decor)
+                if (e is BossEntity pe && (pe.Part != null || pe.Parts.Count > 0))
+                {
+                    // Части не разворачиваются к герою: правые — отражение левых; спящие — под голубым щитом.
+                    fl = pe.Part != null && pe.Part.Mirror;
+                    if (pe.Part != null && !Run.PartOpen(pe) && pe.Spawned <= 0f)
+                    {
+                        cl = Lerp(cl, new Color(0.45f, 0.75f, 1f, cl.a), 0.35f);
+                        var sh = new Color(0.55f, 0.9f, 1f, 0.3f);
+                        float gs = sc * 1.4f;
+                        draws.Add((ord - 0.002f, () => img.Draw(_f.Get("glow"), PX(en.Pos.X), PY(en.Pos.Y - hh * 0.6f), U, gs, gs, 0, sh)));
+                    }
+                }
+                bool noShadow = e is BossEntity ns && (ns.Parts.Count > 0 || (ns.Part != null && ns.Part.Kind != BossPartKind.Hand));
+                if (e.Type != EntityType.Effect && e.Type != EntityType.Trapdoor && e.Type != EntityType.Projectile && !decor && !noShadow)
                     draws.Add((ord - 0.001f, () => img.Draw(_f.Get("shadow"), PX(en.Pos.X), PY(en.Pos.Y + 0.3f * sc), U, sc * 0.8f, sc * 0.8f, 0, new Color(1, 1, 1, 0.9f))));
                 var spr = studio ?? _f.Get(sp);
                 draws.Add((ord, () => img.Draw(spr, PX(en.Pos.X), PY(en.Pos.Y - hh * 0.6f), U, sc, sc, an, cl, fl)));
@@ -255,6 +275,28 @@ namespace Conveer
                 c.a = since < 0.08f ? 1f : 0.7f;
             }
             float ord = z.Struck ? -64f : -65f;
+            // Большие кольца и секторы выходят за стены — рисуем их попиксельно в пределах комнаты (как WorldView).
+            bool big = (z.Shape == ZoneShape.Sector || z.Shape == ZoneShape.Ring) &&
+                       (z.Pos.X - z.R < 0f || z.Pos.Y - z.R < 0f || z.Pos.X + z.R > run.Room.W || z.Pos.Y + z.R > run.Room.H);
+            if (big)
+            {
+                draws.Add((ord, () =>
+                {
+                    var room = run.Room;
+                    int x0 = Math.Max(0, (int)PX(0f)), x1 = Math.Min(img.W, (int)PX(room.W));
+                    int y0 = Math.Max(0, (int)PY(0f)), y1 = Math.Min(img.H, (int)PY(room.H));
+                    float e = 2f / U;
+                    for (int y = y0; y < y1; y += 2)
+                        for (int x = x0; x < x1; x += 2)
+                        {
+                            var p = new Vec2(camX + (x + 1f) / U, camY + (y + 1f) / U);
+                            if (!z.Contains(p)) continue;
+                            bool rim = !z.Contains(p + new Vec2(e, 0f)) || !z.Contains(p - new Vec2(e, 0f)) || !z.Contains(p + new Vec2(0f, e)) || !z.Contains(p - new Vec2(0f, e));
+                            img.Fill(x, y, 2, 2, c.r, c.g, c.b, c.a * (rim ? 1f : 120f / 255f));
+                        }
+                }));
+                return;
+            }
             switch (z.Shape)
             {
                 case ZoneShape.Circle:
@@ -341,6 +383,37 @@ namespace Conveer
                 }
         }
 
+        /// <summary>Тело многочастного босса в комнате (null — его нет).</summary>
+        private static BossEntity ArenaBody(Run run)
+        {
+            foreach (var e in run.Room.Entities)
+                if (!e.Dead && e is BossEntity b && b.Parts.Count > 0) return b;
+            return null;
+        }
+
+        /// <summary>Полосы многочастного босса: ярус и по полоске с 10 делениями на каждую открытую часть.</summary>
+        private static void DrawPartsHud(BossEntity body, Frame img, int s)
+        {
+            int bw = img.W * 6 / 10, bx = (img.W - bw) / 2, by = 10 * s, bh = 6 * s;
+            string[] tiers = { "EYES", "HANDS", "MAW", "CORE" };
+            string head = body.BossDef.Key.ToUpperInvariant() + "  TIER " + body.ActiveTier + "/" + body.PhaseCount + ": " + tiers[Math.Max(0, Math.Min(3, body.ActiveTier - 1))];
+            img.Text(head, bx, by, s, new Color(1f, 0.9f, 0.9f));
+            by += 8 * s;
+            var open = body.Parts.Where(p => !p.Dead && Run.PartOpen(p)).ToList();
+            if (open.Count == 0) return;
+            int gap = 6 * s, w = (bw - gap * (open.Count - 1)) / open.Count, x = bx;
+            foreach (var p in open)
+            {
+                img.Fill(x - s, by - s, w + 2 * s, bh + 2 * s, 0.02f, 0.02f, 0.05f, 0.85f);
+                float k = Math.Max(0f, Math.Min(1f, p.Hp / Math.Max(1f, p.MaxHp)));
+                if (p.PhaseShield > 0f) img.Fill(x, by, (int)(w * k), bh, 1f, 1f, 1f);
+                else img.Fill(x, by, (int)(w * k), bh, 0.92f, 0.16f, 0.3f);
+                for (int i = 1; i < p.PhaseCount; i++) img.Fill(x + w * i / p.PhaseCount, by, s, bh, 0.02f, 0.02f, 0.05f, 0.8f);
+                img.Text(p.Part.Key.ToUpperInvariant() + " " + (p.Phase + 1) + "/" + p.PhaseCount, x, by + bh + 3 * s, s, new Color(1f, 0.85f, 0.4f));
+                x += w + gap;
+            }
+        }
+
         // ───────────── Статичный слой ─────────────
 
         private long StaticHash(Run run)
@@ -360,7 +433,7 @@ namespace Conveer
             var room = run.Room;
             int U = _u;
             long hash = StaticHash(run);
-            if (_static == null || _staticRoom != room || hash != _staticHash)
+            if (_static == null || _staticRoom != room || hash != _staticHash || _static.W != (room.W + 2) * _u)
             {
                 _staticRoom = room;
                 _staticHash = hash;
@@ -473,8 +546,13 @@ namespace Conveer
             }
             if (e is BossEntity b)
             {
-                string key = b.IsSegment ? ArtLibrary.SegmentKeyFor(b.BossDef) : "boss:" + b.BossDef.Key;
-                var clip = b.InAttack ? Clips.Of(b.CurrentAttack) : b.Telegraph > 0.05f ? Clip.Attack : b.Raging ? Clip.Rage : Clip.Idle;
+                string key = b.Part != null ? ArtLibrary.PartKeyFor(b.BossDef, b.Part) : b.IsSegment ? ArtLibrary.SegmentKeyFor(b.BossDef) : "boss:" + b.BossDef.Key;
+                var clip = b.InAttack ? Clips.Of(b.CurrentAttack) : b.Telegraph > 0.05f ? Clip.Attack : b.Raging ? Clip.Rage : b.Vel.LengthSq > 0.3f ? Clip.Move : Clip.Idle;
+                if (b.Spawned > 0f) return ArtFrame(key, Clip.Spawn, (int)((1f - Math.Min(1f, b.Spawned / 1.4f)) * 7.99f));
+                // Тело вторит части, которая сейчас бьёт: на его экране — знак этой атаки.
+                if (b.Parts.Count > 0 && !b.InAttack)
+                    foreach (var p in b.Parts)
+                        if (!p.Dead && p.InAttack) { clip = Clips.Of(p.CurrentAttack); break; }
                 return ArtFrame(key, clip, (int)(e.Age * 8f));
             }
             if (e is EnemyEntity en && en.Def != null)
@@ -490,7 +568,7 @@ namespace Conveer
         private void DrawHud(Run run, Frame img)
         {
             if (run.IsHub) return;
-            int s = Math.Max(1, _u / 32);
+            int s = Math.Max(1, _base / 32);
             int hx = 10 * s;
             for (int i = 0; i < run.Health.Containers; i++)
             {
@@ -509,6 +587,11 @@ namespace Conveer
             foreach (var e in run.Room.Entities)
                 if (e is BossEntity b && !b.IsSegment && !b.Dead) { boss = b; break; }
             if (boss == null) return;
+            if (boss.Parts.Count > 0)
+            {
+                DrawPartsHud(boss, img, s);
+                return;
+            }
             // Сверху по центру: снизу слева — панель музыки конвейера.
             int bw = img.W * 5 / 10, bh = 7 * s, bx = (img.W - bw) / 2, by = 10 * s;
             img.Fill(bx - s, by - s, bw + 2 * s, bh + 2 * s, 0.02f, 0.02f, 0.05f, 0.85f);
